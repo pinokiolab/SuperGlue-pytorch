@@ -4,21 +4,45 @@ import os
 import cv2
 import math
 import datetime
+import glob
 
 from scipy.spatial.distance import cdist
 from torch.utils.data import Dataset
 
 class SparseDataset(Dataset):
-    """Sparse correspondences dataset."""
+    """
+    Sparse correspondences dataset.
+    Dataset folder architecture:
+    - dataset_name
+        - place1
+            - test
+                - images
+                    - *.jpg
+            - train
+                - images
+                    - *.jpg
+            -val
+                - images
+                    - *.jpg
+        - place2
+            - test
+                - images
+                    - *.jpg
+            - train
+                - images
+                    - *.jpg
+            -val
+                - images
+                    - *.jpg
+        ...
+    """
 
-    def __init__(self, train_path, nfeatures):
-
-        self.files = []
-        self.files += [train_path + f for f in os.listdir(train_path)]
-
+    def __init__(self, root_path, mode, nfeatures):
+        self.files = glob.glob(os.path.join(root_path, '*', mode, 'images', '*.jpg'), recursive=True)
         self.nfeatures = nfeatures
-        self.sift = cv2.xfeatures2d.SIFT_create(nfeatures=self.nfeatures)
-        self.matcher = cv2.BFMatcher_create(cv2.NORM_L1, crossCheck=False)
+        self.sift = cv2.SIFT_create()
+        self.sift.setNFeatures(maxFeatures=self.nfeatures)
+        self.matcher = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
 
     def __len__(self):
         return len(self.files)

@@ -55,8 +55,8 @@ def MLP(channels: list, do_bn=True):
             nn.Conv1d(channels[i - 1], channels[i], kernel_size=1, bias=True))
         if i < (n-1):
             if do_bn:
-                # layers.append(nn.BatchNorm1d(channels[i]))
-                layers.append(nn.InstanceNorm1d(channels[i]))
+                layers.append(nn.BatchNorm1d(channels[i]))
+                # layers.append(nn.InstanceNorm1d(channels[i]))
             layers.append(nn.ReLU())
     return nn.Sequential(*layers)
 

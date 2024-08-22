@@ -108,10 +108,10 @@ parser.add_argument(
     '--batch_size', type=int, default=1,
     help='batch_size')
 parser.add_argument(
-    '--train_path', type=str, default='/home/yinxinjia/yingxin/dataset/COCO2014_train/', 
+    '--train_path', type=str, default='/workspace/raw_data/yfcc100m', 
     help='Path to the directory of training imgs.')
 parser.add_argument(
-    '--epoch', type=int, default=20,
+    '--epoch', type=int, default=1,
     help='Number of epoches')
 
 
@@ -145,8 +145,9 @@ if __name__ == '__main__':
     }
 
     # load training data
-    train_set = SparseDataset(opt.train_path, opt.max_keypoints)
+    train_set = SparseDataset(opt.train_path, 'train', opt.max_keypoints)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True)
+    print(f'Training data loaded with {len(train_set)} images.')
 
     superglue = SuperGlue(config.get('superglue', {}))
 
