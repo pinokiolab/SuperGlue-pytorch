@@ -11,6 +11,7 @@ from load_data import SparseDataset
 import os
 import torch.multiprocessing
 from tqdm import tqdm
+import math
 
 from models.utils import (compute_pose_error, compute_epipolar_error,
                           estimate_pose, make_matching_plot,
@@ -38,7 +39,7 @@ parser.add_argument(
             ' (requires ground truth pose and intrinsics)')
 
 parser.add_argument(
-    '--superglue', choices={'indoor', 'outdoor'}, default='indoor',
+    '--superglue', choices={'indoor', 'outdoor'}, default='outdoor',
     help='SuperGlue weights')
 parser.add_argument(
     '--max_keypoints', type=int, default=1024,
@@ -55,7 +56,7 @@ parser.add_argument(
     '--sinkhorn_iterations', type=int, default=20,
     help='Number of Sinkhorn iterations performed by SuperGlue')
 parser.add_argument(
-    '--match_threshold', type=float, default=0.2,
+    '--match_threshold', type=float, default=0.05,
     help='SuperGlue match threshold')
 
 parser.add_argument(
@@ -97,7 +98,7 @@ parser.add_argument(
     '--eval_input_dir', type=str, default='assets/scannet_sample_images/',
     help='Path to the directory that contains the images')
 parser.add_argument(
-    '--eval_output_dir', type=str, default='dump_match_pairs/',
+    '--eval_output_dir', type=str, default='dump_match_pairs_gpu1/',
     help='Path to the directory in which the .npz results and optional,'
             'visualizations are written')
 parser.add_argument(
@@ -108,10 +109,10 @@ parser.add_argument(
     '--batch_size', type=int, default=1,
     help='batch_size')
 parser.add_argument(
-    '--train_path', type=str, default='/workspace/raw_data/yfcc100m', 
+    '--train_path', type=str, default='/workspace/yfcc100m', 
     help='Path to the directory of training imgs.')
 parser.add_argument(
-    '--epoch', type=int, default=1,
+    '--epoch', type=int, default=20,
     help='Number of epoches')
 
 
@@ -149,6 +150,11 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True)
     print(f'Training data loaded with {len(train_set)} images.')
 
+    # load validation data
+    valid_set = SparseDataset(opt.train_path, 'val', opt.max_keypoints)
+    valid_loader = torch.utils.data.DataLoader(dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True)
+    print(f'Validation data loaded with {len(valid_set)} images.')
+
     superglue = SuperGlue(config.get('superglue', {}))
 
     if torch.cuda.is_available():
@@ -159,9 +165,10 @@ if __name__ == '__main__':
     mean_loss = []
 
     # start training
+    best_loss = math.inf
     for epoch in range(1, opt.epoch+1):
         epoch_loss = 0
-        superglue.double().train()
+        superglue.cuda().double().train()
         for i, pred in enumerate(train_loader):
             for k in pred:
                 if k != 'file_name' and k!='image0' and k!='image1':
@@ -188,9 +195,9 @@ if __name__ == '__main__':
             optimizer.step()
 
             # for every 50 images, print progress and visualize the matches
-            if (i+1) % 50 == 0:
-                print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' 
-                    .format(epoch, opt.epoch, i+1, len(train_loader), torch.mean(torch.stack(mean_loss)).item())) 
+            if (i+1) % 500 == 0:
+                print ('Epoch [{}/{}], Step [{}/{}], Train Loss: {:.4f}' 
+                    .format(epoch, opt.epoch, i+1, len(train_loader), torch.mean(torch.stack(mean_loss)).item()))
                 mean_loss = []
 
                 ### eval ###
@@ -205,7 +212,7 @@ if __name__ == '__main__':
                 mkpts0 = kpts0[valid]
                 mkpts1 = kpts1[matches[valid]]
                 mconf = conf[valid]
-                viz_path = eval_output_dir / '{}_matches.{}'.format(str(i), opt.viz_extension)
+                viz_path = eval_output_dir / '{}_matches.{}'.format(str(i+1), opt.viz_extension)
                 color = cm.jet(mconf)
                 stem = pred['file_name']
                 text = []
@@ -215,18 +222,36 @@ if __name__ == '__main__':
                     text, viz_path, stem, stem, opt.show_keypoints,
                     opt.fast_viz, opt.opencv_display, 'Matches')
 
-            # process checkpoint for every 5e3 images
-            if (i+1) % 5e3 == 0:
-                model_out_path = "model_epoch_{}.pth".format(epoch)
-                torch.save(superglue, model_out_path)
-                print ('Epoch [{}/{}], Step [{}/{}], Checkpoint saved to {}' 
-                    .format(epoch, opt.epoch, i+1, len(train_loader), model_out_path)) 
+        superglue.eval()
+        with torch.no_grad():
+            valid_loss = []
+            for i, pred in enumerate(valid_loader):
+                for k in pred:
+                    if k != 'file_name' and k!='image0' and k!='image1':
+                        if type(pred[k]) == torch.Tensor:
+                            pred[k] = Variable(pred[k].cuda())
+                        else:
+                            pred[k] = Variable(torch.stack(pred[k]).cuda())
+                    
+                data = superglue(pred)
+                for k, v in pred.items():
+                    pred[k] = v[0]
+                pred = {**pred, **data}
 
+                if pred['skip_train'] == True: # image has no keypoint
+                    continue
+                
+                # process loss
+                valid_loss.append(pred['loss'].item())
+            valid_loss = torch.mean(torch.stack(valid_loss)).item()
+            if valid_loss < best_loss:
+                best_loss = valid_loss
+                torch.save(superglue.cpu().state_dict(), "best_model.pth")
+                print("Best model saved.")
+        
         # save checkpoint when an epoch finishes
         epoch_loss /= len(train_loader)
         model_out_path = "model_epoch_{}.pth".format(epoch)
-        torch.save(superglue, model_out_path)
-        print("Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}"
-            .format(epoch, opt.epoch, epoch_loss, model_out_path))
-        
-
+        torch.save(superglue.cpu().state_dict(), model_out_path)
+        print("Epoch [{}/{}] done. Train Loss: {:.4f} Valid Loss: {:.4f}. Checkpoint saved to {}"
+            .format(epoch, opt.epoch, epoch_loss, valid_loss, model_out_path))

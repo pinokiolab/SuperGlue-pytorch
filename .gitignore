@@ -2,4 +2,6 @@
 *.DS_Store
 *.swp
 
-dump_match_pairs/
+dump_match_pairs*/
+best_model.pth
+model_epoch_*.pth

@@ -36,11 +36,12 @@ For more details, please see:
 -   OpenCV >= 3.4 (4.1.2.30 recommended for best GUI keyboard interaction, see this [note](#additional-notes))
 -   Matplotlib >= 3.1
 -   NumPy >= 1.18
+-   Scipy
 
 Simply run the following command:
 
 ```bash
-pip install numpy opencv-contrib-python torch matplotlib
+pip install numpy opencv-contrib-python torch matplotlib scipy
 ```
 
 Or create a conda environment by `conda install --name myenv --file superglue.txt`
