@@ -41,7 +41,7 @@ parser.add_argument(
     '--superglue', choices={'indoor', 'outdoor'}, default='indoor',
     help='SuperGlue weights')
 parser.add_argument(
-    '--max_keypoints', type=int, default=1024,
+    '--max_keypoints', type=int, default=-1,
     help='Maximum number of keypoints detected by Superpoint'
             ' (\'-1\' keeps all keypoints)')
 parser.add_argument(
@@ -111,7 +111,7 @@ parser.add_argument(
     '--train_path', type=str, default='/workspace/raw_data/yfcc100m', 
     help='Path to the directory of training imgs.')
 parser.add_argument(
-    '--epoch', type=int, default=1,
+    '--epoch', type=int, default=2,
     help='Number of epoches')
 
 
@@ -229,4 +229,3 @@ if __name__ == '__main__':
         print("Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}"
             .format(epoch, opt.epoch, epoch_loss, model_out_path))
         
-

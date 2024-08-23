@@ -44,6 +44,8 @@ from pathlib import Path
 import torch
 from torch import nn
 
+import sys
+
 def simple_nms(scores, nms_radius: int):
     """ Fast Non-maximum suppression to remove nearby points """
     assert(nms_radius >= 0)
@@ -133,6 +135,7 @@ class SuperPoint(nn.Module):
             c5, self.config['descriptor_dim'],
             kernel_size=1, stride=1, padding=0)
 
+
         path = Path(__file__).parent / 'weights/superpoint_v1.pth'
         self.load_state_dict(torch.load(str(path)))
 
@@ -145,7 +148,8 @@ class SuperPoint(nn.Module):
     def forward(self, data):
         """ Compute keypoints, scores, descriptors for image """
         # Shared Encoder
-        x = self.relu(self.conv1a(data['image']))
+
+        x = self.relu(self.conv1a(data))
         x = self.relu(self.conv1b(x))
         x = self.pool(x)
         x = self.relu(self.conv2a(x))
@@ -158,6 +162,7 @@ class SuperPoint(nn.Module):
         x = self.relu(self.conv4b(x))
 
         # Compute the dense keypoint scores
+        
         cPa = self.relu(self.convPa(x))
         scores = self.convPb(cPa)
         scores = torch.nn.functional.softmax(scores, 1)[:, :-1]
@@ -187,8 +192,28 @@ class SuperPoint(nn.Module):
         keypoints = [torch.flip(k, [1]).float() for k in keypoints]
 
         # Compute the dense descriptors
-        cDa = self.relu(self.convDa(x))
-        descriptors = self.convDb(cDa)
+
+        # ******** orig
+        # convTemp = nn.Conv2d(
+        #     256, 128,  # Set the number of output channels to 128
+        #     kernel_size=1, stride=1, padding=0
+        # )
+        # cDa = self.relu(convTemp(x))
+        # ******** orig
+
+        convDa = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        cDa = self.relu(convDa(x.to('cpu')))
+        convDb = nn.Conv2d(
+            256, 128,
+            kernel_size=1, stride=1, padding=0)
+        # descriptors = self.convDb(cDa)
+        descriptors = convDb(cDa.to('cpu'))
+        # cDa = self.relu(self.convDa(x))
+        # descriptors = self.convDb(cDa)
+        descriptors = descriptors.to('cuda:0')
+
+        dn = torch.norm(descriptors, p=2, dim=1) # Compute the norm:(batch,15,30)
+        descriptors = descriptors.div(torch.unsqueeze(dn, 1)) # Divide by norm to normalize:(batch,256,15,30)
         descriptors = torch.nn.functional.normalize(descriptors, p=2, dim=1)
 
         # Extract descriptors
