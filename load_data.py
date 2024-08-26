@@ -47,8 +47,8 @@ class SparseDataset(Dataset):
     config = {
         'superpoint': {
             'descriptor_dim': 256,
-            'nms_radius': 4,
-            'keypoint_threshold': 0.005,
+            'nms_radius': 1,
+            'keypoint_threshold': 0.015,
             'max_keypoints': -1,
             'remove_borders': 4,
             }
@@ -159,8 +159,10 @@ class SparseDataset(Dataset):
         descs1 = np.transpose(descs1 / 256.)
         descs2 = np.transpose(descs2 / 256.)
 
-        image = torch.from_numpy(image/255.).double()[None].cuda()
-        warped = torch.from_numpy(warped/255.).double()[None].cuda()
+        # image = torch.from_numpy(image/255.).double()[None].cuda()
+        # warped = torch.from_numpy(warped/255.).double()[None].cuda()
+        image = torch.from_numpy(image/255.).double()[None].to('cuda:0')
+        warped = torch.from_numpy(warped/255.).double()[None].to('cuda:0')
 
         return{
             'keypoints0': list(kp1_np),

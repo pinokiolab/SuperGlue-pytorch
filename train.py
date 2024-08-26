@@ -38,17 +38,17 @@ parser.add_argument(
             ' (requires ground truth pose and intrinsics)')
 
 parser.add_argument(
-    '--superglue', choices={'indoor', 'outdoor'}, default='indoor',
+    '--superglue', choices={'indoor', 'outdoor'}, default='outdoor',
     help='SuperGlue weights')
 parser.add_argument(
     '--max_keypoints', type=int, default=-1,
     help='Maximum number of keypoints detected by Superpoint'
             ' (\'-1\' keeps all keypoints)')
 parser.add_argument(
-    '--keypoint_threshold', type=float, default=0.005,
+    '--keypoint_threshold', type=float, default=0.015,
     help='SuperPoint keypoint detector confidence threshold')
 parser.add_argument(
-    '--nms_radius', type=int, default=4,
+    '--nms_radius', type=int, default=1,
     help='SuperPoint Non Maximum Suppression (NMS) radius'
     ' (Must be positive)')
 parser.add_argument(
@@ -111,7 +111,7 @@ parser.add_argument(
     '--train_path', type=str, default='/workspace/raw_data/yfcc100m', 
     help='Path to the directory of training imgs.')
 parser.add_argument(
-    '--epoch', type=int, default=2,
+    '--epoch', type=int, default=20,
     help='Number of epoches')
 
 
@@ -152,23 +152,29 @@ if __name__ == '__main__':
     superglue = SuperGlue(config.get('superglue', {}))
 
     if torch.cuda.is_available():
-        superglue.cuda() # make sure it trains on GPU
+        # superglue.cuda() # make sure it trains on GPU
+        superglue.to('cuda:0') # make sure it trains on GPU
     else:
         print("### CUDA not available ###")
     optimizer = torch.optim.Adam(superglue.parameters(), lr=opt.learning_rate)
     mean_loss = []
 
+   
     # start training
     for epoch in range(1, opt.epoch+1):
+        # ctr = 0
         epoch_loss = 0
         superglue.double().train()
         for i, pred in enumerate(train_loader):
             for k in pred:
                 if k != 'file_name' and k!='image0' and k!='image1':
                     if type(pred[k]) == torch.Tensor:
-                        pred[k] = Variable(pred[k].cuda())
+                        # pred[k] = Variable(pred[k].cuda())
+                        pred[k] = Variable(pred[k].to('cuda:0'))
                     else:
-                        pred[k] = Variable(torch.stack(pred[k]).cuda())
+                        # pred[k] = Variable(torch.stack(pred[k]).cuda())
+                        pred[k] = Variable(torch.stack(pred[k]).to('cuda:0'))
+
                 
             data = superglue(pred)
             for k, v in pred.items():
@@ -188,7 +194,7 @@ if __name__ == '__main__':
             optimizer.step()
 
             # for every 50 images, print progress and visualize the matches
-            if (i+1) % 50 == 0:
+            if (i+1) % 100 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' 
                     .format(epoch, opt.epoch, i+1, len(train_loader), torch.mean(torch.stack(mean_loss)).item())) 
                 mean_loss = []
@@ -216,15 +222,22 @@ if __name__ == '__main__':
                     opt.fast_viz, opt.opencv_display, 'Matches')
 
             # process checkpoint for every 5e3 images
-            if (i+1) % 5e3 == 0:
-                model_out_path = "model_epoch_{}.pth".format(epoch)
-                torch.save(superglue, model_out_path)
-                print ('Epoch [{}/{}], Step [{}/{}], Checkpoint saved to {}' 
-                    .format(epoch, opt.epoch, i+1, len(train_loader), model_out_path)) 
+            # print('aa')
+            # print(ctr)
+            # ctr += 1
+            # if (i+1) % 100 == 0:
+            #     model_out_path = "model_epoch_{}.pth".format(epoch)
+            #     torch.save(superglue, model_out_path)
+            #     print ('Epoch [{}/{}], Step [{}/{}], Checkpoint saved to {}' 
+            #         .format(epoch, opt.epoch, i+1, len(train_loader), model_out_path)) 
+                
+            # if (i+1) % 100 == 0:
+            #     print ('Epoch [{}/{}], Step [{}/{}]' 
+            #         .format(epoch, opt.epoch, i+1, len(train_loader))) 
 
         # save checkpoint when an epoch finishes
         epoch_loss /= len(train_loader)
-        model_out_path = "model_epoch_{}.pth".format(epoch)
+        model_out_path = "/workspace/train2/model_epoch_{}.pth".format(epoch)
         torch.save(superglue, model_out_path)
         print("Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}"
             .format(epoch, opt.epoch, epoch_loss, model_out_path))

@@ -105,7 +105,7 @@ class SuperPoint(nn.Module):
     default_config = {
         'descriptor_dim': 256,
         'nms_radius': 4,
-        'keypoint_threshold': 0.005,
+        'keypoint_threshold': 0.015,
         'max_keypoints': -1,
         'remove_borders': 4,
     }
@@ -135,6 +135,8 @@ class SuperPoint(nn.Module):
             c5, self.config['descriptor_dim'],
             kernel_size=1, stride=1, padding=0)
 
+        print("********************")
+        print(self.config['descriptor_dim'])
 
         path = Path(__file__).parent / 'weights/superpoint_v1.pth'
         self.load_state_dict(torch.load(str(path)))
@@ -199,18 +201,24 @@ class SuperPoint(nn.Module):
         #     kernel_size=1, stride=1, padding=0
         # )
         # cDa = self.relu(convTemp(x))
-        # ******** orig
 
-        convDa = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
-        cDa = self.relu(convDa(x.to('cpu')))
-        convDb = nn.Conv2d(
-            256, 128,
-            kernel_size=1, stride=1, padding=0)
         # descriptors = self.convDb(cDa)
-        descriptors = convDb(cDa.to('cpu'))
         # cDa = self.relu(self.convDa(x))
         # descriptors = self.convDb(cDa)
-        descriptors = descriptors.to('cuda:0')
+
+        cDa = self.relu(self.convDa(x))
+        descriptors = self.convDb(cDa)
+        descriptors = torch.nn.functional.normalize(descriptors, p=2, dim=1)
+        # ******** orig
+
+        # convDa = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        # cDa = self.relu(convDa(x.to('cpu')))
+        # convDb = nn.Conv2d(
+        #     256, 128,
+        #     kernel_size=1, stride=1, padding=0)
+   
+        # descriptors = convDb(cDa.to('cpu'))
+        # descriptors = descriptors.to('cuda:0')
 
         dn = torch.norm(descriptors, p=2, dim=1) # Compute the norm:(batch,15,30)
         descriptors = descriptors.div(torch.unsqueeze(dn, 1)) # Divide by norm to normalize:(batch,256,15,30)
