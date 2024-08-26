@@ -238,7 +238,7 @@ class SuperGlue(nn.Module):
         kpts0 = torch.reshape(kpts0, (1, -1, 2))
         kpts1 = torch.reshape(kpts1, (1, -1, 2))
     
-        if kpts0.shape[1] == 0 or kpts1.shape[1] == 0:  # no keypoints
+        if kpts0.shape[1] <= 1 or kpts1.shape[1] <= 1:  # no keypoints
             shape0, shape1 = kpts0.shape[:-1], kpts1.shape[:-1]
             return {
                 'matches0': kpts0.new_full(shape0, -1, dtype=torch.int)[0],
