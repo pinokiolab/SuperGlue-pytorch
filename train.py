@@ -60,7 +60,7 @@ parser.add_argument(
     help='SuperGlue match threshold')
 
 parser.add_argument(
-    '--resize', type=int, nargs='+', default=[640, 480],
+    '--resize', type=int, nargs='+', default=[-1],
     help='Resize the input image before running inference. If two numbers, '
             'resize to the exact dimensions, if one number, resize the max '
             'dimension, if -1, do not resize')
@@ -98,7 +98,7 @@ parser.add_argument(
     '--eval_input_dir', type=str, default='assets/scannet_sample_images/',
     help='Path to the directory that contains the images')
 parser.add_argument(
-    '--eval_output_dir', type=str, default='dump_match_pairs_1/',
+    '--eval_output_dir', type=str, default='dump_match_pairs_0/',
     help='Path to the directory in which the .npz results and optional,'
             'visualizations are written')
 parser.add_argument(

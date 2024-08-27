@@ -42,14 +42,13 @@ class SparseDataset(Dataset):
         self.nfeatures = nfeatures
         self.sift = cv2.SIFT_create()
         self.sift.setNFeatures(maxFeatures=self.nfeatures)
-        self.matcher = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
         file_name = self.files[idx]
-        image = cv2.imread(file_name, cv2.IMREAD_GRAYSCALE) 
+        image = cv2.resize(cv2.imread(file_name, cv2.IMREAD_GRAYSCALE), (640, 480))
         sift = self.sift
         width, height = image.shape[:2]
         corners = np.array([[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32)
@@ -94,7 +93,6 @@ class SparseDataset(Dataset):
         descs2 = descs2[:kp2_num, :]
 
         # obtain the matching matrix of the image pair
-        matched = self.matcher.match(descs1, descs2)
         kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((1, -1, 2)), M)[0, :, :] 
         dists = cdist(kp1_projected, kp2_np)
 

@@ -248,7 +248,6 @@ class SuperGlue(nn.Module):
                 'skip_train': True
             }
 
-        file_name = data['file_name']
         all_matches = data['all_matches'].permute(1,2,0) # shape=torch.Size([1, 87, 2])
         
         # Keypoint normalization.
